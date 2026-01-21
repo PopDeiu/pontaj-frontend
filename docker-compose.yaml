@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   qr-web:
-    image: qr-web:latest
+    image: pontaj-frontend:latest
     ports:
       - "8001:80"
     environment:
