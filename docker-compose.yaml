@@ -4,7 +4,7 @@ services:
   qr-web:
     image: qr-web:latest
     ports:
-      - "8080:80"
+      - "8001:80"
     environment:
       DEFAULT_BACKEND: "https://api.pontaj.binarysquad.club/frontend/scan"
     restart: unless-stopped
