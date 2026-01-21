@@ -1,0 +1,176 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QR Scanner</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 20px; }
+    video { width: 520px; max-width: 100%; border-radius: 12px; background: #111; }
+    .row { margin-top: 12px; }
+    input { width: 520px; max-width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #ccc; }
+    #status { margin-top: 10px; }
+    code { background: #f5f5f5; padding: 2px 6px; border-radius: 6px; }
+  </style>
+  <script src="env.js"></script>
+</head>
+<body>
+  <h2>QR Scanner</h2>
+
+  <div class="row">
+    <label>Backend endpoint (POST):</label><br/>
+    <input id="backend" placeholder="https://your-backend.example.com/api/scan" />
+    <div style="font-size: 0.9em; opacity: 0.8; margin-top: 6px;">
+      Tip: you can also set <code>?backend=https://...</code> in the URL.
+    </div>
+  </div>
+
+  <div class="row">
+    <video id="video" autoplay playsinline></video>
+  </div>
+
+  <div id="status">Initializing…</div>
+
+  <!-- Fallback library if BarcodeDetector is missing -->
+  <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script>
+    const video = document.getElementById("video");
+    const statusEl = document.getElementById("status");
+    const backendInput = document.getElementById("backend");
+
+    // --- config ---
+    const DEFAULT_BACKEND = window.APP_CONFIG?.DEFAULT_BACKEND ;
+    const COOLDOWN_MS = 2000;
+
+    // Read backend from querystring if provided
+    const params = new URLSearchParams(window.location.search);
+    backendInput.value = params.get("backend") || DEFAULT_BACKEND;
+
+    let lastValue = null;
+    let lastSentAt = 0;
+
+    function canSend(value) {
+      const now = Date.now();
+      if (value !== lastValue || (now - lastSentAt) > COOLDOWN_MS) {
+        lastValue = value;
+        lastSentAt = now;
+        return true;
+      }
+      return false;
+    }
+
+    async function postValue(value) {
+      const url = backendInput.value.trim();
+      if (!url) return;
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          value,
+          scanned_at: new Date().toISOString(),
+          user_agent: navigator.userAgent
+        })
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Backend error ${res.status}: ${text}`);
+      }
+    }
+
+    async function startCamera() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("getUserMedia not supported");
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+        audio: false
+      });
+      video.srcObject = stream;
+      await video.play();
+    }
+
+    // -------- Option A: BarcodeDetector ----------
+    async function scanWithBarcodeDetector() {
+      const detector = new BarcodeDetector({ formats: ["qr_code"] });
+
+      const loop = async () => {
+        try {
+          const codes = await detector.detect(video);
+          if (codes?.length) {
+            const value = codes[0].rawValue;
+            statusEl.textContent = `Detected: ${value}`;
+            if (canSend(value)) {
+              statusEl.textContent = `Sending: ${value}`;
+              await postValue(value);
+              statusEl.textContent = `Sent ✅: ${value}`;
+            }
+          } else {
+            statusEl.textContent = "No QR detected";
+          }
+        } catch (e) {
+          statusEl.textContent = "Scan error: " + e.message;
+        }
+        requestAnimationFrame(loop);
+      };
+      loop();
+    }
+
+    // -------- Option B: jsQR fallback (canvas) ----------
+    async function scanWithJsQR() {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+      const loop = async () => {
+        try {
+          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+            if (code?.data) {
+              const value = code.data;
+              statusEl.textContent = `Detected: ${value}`;
+              if (canSend(value)) {
+                statusEl.textContent = `Sending: ${value}`;
+                await postValue(value);
+                statusEl.textContent = `Sent ✅: ${value}`;
+              }
+            } else {
+              statusEl.textContent = "No QR detected";
+            }
+          }
+        } catch (e) {
+          statusEl.textContent = "Scan error: " + e.message;
+        }
+        requestAnimationFrame(loop);
+      };
+      loop();
+    }
+
+    (async () => {
+      try {
+        // Webcam requires HTTPS except localhost.
+        statusEl.textContent = "Starting camera…";
+        await startCamera();
+
+        if ("BarcodeDetector" in window) {
+          statusEl.textContent = "Scanning (BarcodeDetector)…";
+          await scanWithBarcodeDetector();
+        } else {
+          statusEl.textContent = "Scanning (jsQR fallback)…";
+          await scanWithJsQR();
+        }
+      } catch (e) {
+        statusEl.textContent =
+          "Failed to start: " + e.message +
+          " | Note: webcam access requires HTTPS (or localhost).";
+      }
+    })();
+  </script>
+</body>
+</html>

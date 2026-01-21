@@ -1,0 +1,3 @@
+window.APP_CONFIG = {
+  DEFAULT_BACKEND: "__DEFAULT_BACKEND__"
+};
