@@ -4,55 +4,299 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>QR Scanner</title>
-  <style>
-    body { font-family: system-ui, sans-serif; margin: 20px; }
-    video { width: 520px; max-width: 100%; border-radius: 12px; background: #111; }
-    .row { margin-top: 12px; }
-    input { width: 520px; max-width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #ccc; }
-    #status { margin-top: 10px; }
-    code { background: #f5f5f5; padding: 2px 6px; border-radius: 6px; }
-  </style>
-  <script src="env.js"></script>
-</head>
-<body>
-  <h2>QR Scanner</h2>
 
-  <div class="row">
-    <label>Backend endpoint (POST):</label><br/>
-    <input id="backend" placeholder="https://your-backend.example.com/api/scan" />
-    <div style="font-size: 0.9em; opacity: 0.8; margin-top: 6px;">
-      Tip: you can also set <code>?backend=https://...</code> in the URL.
+  <!-- Optional runtime config (recommended). If you don't use it, DEFAULT_BACKEND falls back to /api/scan -->
+  <script src="env.js"></script>
+
+  <style>
+    :root{
+      --bg1:#0b1020;
+      --bg2:#0a1a2a;
+      --card:#0f172a;
+      --card2:#111c33;
+      --text:#e6eaf2;
+      --muted:#9aa7bd;
+      --ok:#16a34a;
+      --warn:#f59e0b;
+      --err:#ef4444;
+      --ring: rgba(99,102,241,.35);
+      --shadow: 0 20px 60px rgba(0,0,0,.45);
+      --radius: 18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      color:var(--text);
+      background:
+        radial-gradient(900px 600px at 20% 10%, rgba(99,102,241,.25), transparent 55%),
+        radial-gradient(900px 600px at 80% 30%, rgba(14,165,233,.18), transparent 55%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:28px;
+    }
+
+    .shell{
+      width:min(980px, 100%);
+      display:grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap:18px;
+    }
+
+    @media (max-width: 880px){
+      .shell{grid-template-columns:1fr}
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+
+    .header{
+      padding:18px 18px 12px 18px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      background: linear-gradient(180deg, rgba(255,255,255,.04), transparent);
+    }
+
+    .title{
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+    }
+
+    .title h1{
+      margin:0;
+      font-size: 18px;
+      letter-spacing:.2px;
+      font-weight: 650;
+    }
+
+    .title p{
+      margin:0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .pill{
+      font-size:12px;
+      padding:8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(15,23,42,.35);
+      color: var(--muted);
+      white-space:nowrap;
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+
+    .dot{
+      width:8px;height:8px;border-radius:50%;
+      background: var(--warn);
+      box-shadow: 0 0 0 4px rgba(245,158,11,.12);
+    }
+    .dot.ok{
+      background: var(--ok);
+      box-shadow: 0 0 0 4px rgba(22,163,74,.12);
+    }
+    .dot.err{
+      background: var(--err);
+      box-shadow: 0 0 0 4px rgba(239,68,68,.12);
+    }
+
+    .videoWrap{
+      padding: 0 18px 18px 18px;
+    }
+
+    .videoFrame{
+      position:relative;
+      border-radius: calc(var(--radius) - 4px);
+      overflow:hidden;
+      background: rgba(0,0,0,.35);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+
+    video{
+      width:100%;
+      display:block;
+      aspect-ratio: 16/10;
+      object-fit: cover;
+      background: #050914;
+    }
+
+    /* subtle scanning frame */
+    .overlay{
+      position:absolute; inset:0;
+      pointer-events:none;
+      background:
+        radial-gradient(closest-side at 50% 50%, transparent 68%, rgba(0,0,0,.35) 100%);
+    }
+
+    .scanBox{
+      position:absolute;
+      left:50%; top:50%;
+      transform: translate(-50%,-50%);
+      width:min(62%, 420px);
+      aspect-ratio:1/1;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.22);
+      box-shadow: 0 0 0 6px rgba(99,102,241,.08);
+      background: linear-gradient(180deg, rgba(99,102,241,.08), transparent);
+    }
+    .corn{
+      position:absolute; width:18px; height:18px;
+      border: 3px solid rgba(255,255,255,.75);
+      border-right:none; border-bottom:none;
+      filter: drop-shadow(0 6px 18px rgba(0,0,0,.35));
+    }
+    .c1{left:10px; top:10px; border-radius: 10px 0 0 0;}
+    .c2{right:10px; top:10px; transform: rotate(90deg); border-radius: 10px 0 0 0;}
+    .c3{right:10px; bottom:10px; transform: rotate(180deg); border-radius: 10px 0 0 0;}
+    .c4{left:10px; bottom:10px; transform: rotate(270deg); border-radius: 10px 0 0 0;}
+
+    .side{
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+
+    .statusCard{
+      padding:14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(15,23,42,.45);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+
+    .label{
+      font-size:12px;
+      color: var(--muted);
+      margin-bottom:8px;
+    }
+
+    .statusLine{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+
+    .statusText{
+      font-size:14px;
+      line-height:1.35;
+      font-weight: 600;
+      word-break: break-word;
+    }
+
+    .hint{
+      margin-top:8px;
+      font-size:12px;
+      color: var(--muted);
+      line-height:1.45;
+    }
+
+    .lastValue{
+      margin-top:12px;
+      padding:10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(17,24,39,.35);
+      color: rgba(230,234,242,.95);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:12px;
+      overflow:auto;
+      max-height: 140px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="shell">
+    <div class="card">
+      <div class="header">
+        <div class="title">
+          <h1>Scan QR Code</h1>
+          <p>Hold the code inside the frame</p>
+        </div>
+        <div class="pill" id="pill">
+          <span class="dot" id="dot"></span>
+          <span id="pillText">Starting…</span>
+        </div>
+      </div>
+
+      <div class="videoWrap">
+        <div class="videoFrame">
+          <video id="video" autoplay playsinline></video>
+          <div class="overlay"></div>
+          <div class="scanBox">
+            <span class="corn c1"></span><span class="corn c2"></span>
+            <span class="corn c3"></span><span class="corn c4"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="side">
+        <div class="statusCard">
+          <div class="label">Status</div>
+          <div class="statusLine">
+            <div class="statusText" id="status">Initializing…</div>
+          </div>
+          <div class="hint" id="hint">
+            Camera permission is required. Webcam access needs HTTPS (or localhost).
+          </div>
+
+          <div class="label" style="margin-top:14px;">Last decoded value</div>
+          <div class="lastValue" id="lastValue">(none)</div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="row">
-    <video id="video" autoplay playsinline></video>
-  </div>
-
-  <div id="status">Initializing…</div>
-
   <!-- Fallback library if BarcodeDetector is missing -->
   <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+
   <script>
     const video = document.getElementById("video");
     const statusEl = document.getElementById("status");
-    const backendInput = document.getElementById("backend");
+    const hintEl = document.getElementById("hint");
+    const lastValueEl = document.getElementById("lastValue");
 
-    // --- config ---
-    const DEFAULT_BACKEND = window.APP_CONFIG?.DEFAULT_BACKEND ;
+    const dotEl = document.getElementById("dot");
+    const pillTextEl = document.getElementById("pillText");
+
+    // Backend endpoint set via env.js -> window.APP_CONFIG.DEFAULT_BACKEND
+    // Fallback to /api/scan (recommended with reverse proxy) or replace with a full URL if you want.
+    const DEFAULT_BACKEND =
+      (window.APP_CONFIG && window.APP_CONFIG.DEFAULT_BACKEND) || "/api/scan";
+
     const COOLDOWN_MS = 2000;
-
-    // Read backend from querystring if provided
-    const params = new URLSearchParams(window.location.search);
-    backendInput.value = params.get("backend") || DEFAULT_BACKEND;
-
-    let lastValue = null;
+    let lastSentValue = null;
     let lastSentAt = 0;
+
+    function setPill(state, text) {
+      pillTextEl.textContent = text;
+      dotEl.classList.remove("ok", "err");
+      if (state === "ok") dotEl.classList.add("ok");
+      else if (state === "err") dotEl.classList.add("err");
+      // default is warn-ish
+    }
 
     function canSend(value) {
       const now = Date.now();
-      if (value !== lastValue || (now - lastSentAt) > COOLDOWN_MS) {
-        lastValue = value;
+      if (value !== lastSentValue || (now - lastSentAt) > COOLDOWN_MS) {
+        lastSentValue = value;
         lastSentAt = now;
         return true;
       }
@@ -60,10 +304,7 @@
     }
 
     async function postValue(value) {
-      const url = backendInput.value.trim();
-      if (!url) return;
-
-      const res = await fetch(url, {
+      const res = await fetch(DEFAULT_BACKEND, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -75,13 +316,13 @@
 
       if (!res.ok) {
         const text = await res.text().catch(() => "");
-        throw new Error(`Backend error ${res.status}: ${text}`);
+        throw new Error(`Backend error ${res.status}${text ? ": " + text : ""}`);
       }
     }
 
     async function startCamera() {
       if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("getUserMedia not supported");
+        throw new Error("getUserMedia not supported in this browser");
       }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
@@ -91,7 +332,7 @@
       await video.play();
     }
 
-    // -------- Option A: BarcodeDetector ----------
+    // Option A: BarcodeDetector
     async function scanWithBarcodeDetector() {
       const detector = new BarcodeDetector({ formats: ["qr_code"] });
 
@@ -100,24 +341,34 @@
           const codes = await detector.detect(video);
           if (codes?.length) {
             const value = codes[0].rawValue;
-            statusEl.textContent = `Detected: ${value}`;
+            lastValueEl.textContent = value;
+
+            setPill("ok", "Code detected");
+            statusEl.textContent = "QR detected. Sending…";
+            hintEl.textContent = "Keep the code steady for a moment.";
+
             if (canSend(value)) {
-              statusEl.textContent = `Sending: ${value}`;
               await postValue(value);
-              statusEl.textContent = `Sent ✅: ${value}`;
+              statusEl.textContent = "Sent ✅";
+            } else {
+              statusEl.textContent = "Detected (waiting cooldown)…";
             }
           } else {
-            statusEl.textContent = "No QR detected";
+            setPill("warn", "Scanning…");
+            statusEl.textContent = "Looking for a QR code…";
+            hintEl.textContent = "Hold the QR inside the frame.";
           }
         } catch (e) {
+          setPill("err", "Scan error");
           statusEl.textContent = "Scan error: " + e.message;
+          hintEl.textContent = "Try refreshing the page or checking camera permissions.";
         }
         requestAnimationFrame(loop);
       };
       loop();
     }
 
-    // -------- Option B: jsQR fallback (canvas) ----------
+    // Option B: jsQR fallback (canvas)
     async function scanWithJsQR() {
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -134,18 +385,28 @@
 
             if (code?.data) {
               const value = code.data;
-              statusEl.textContent = `Detected: ${value}`;
+              lastValueEl.textContent = value;
+
+              setPill("ok", "Code detected");
+              statusEl.textContent = "QR detected. Sending…";
+              hintEl.textContent = "Keep the code steady for a moment.";
+
               if (canSend(value)) {
-                statusEl.textContent = `Sending: ${value}`;
                 await postValue(value);
-                statusEl.textContent = `Sent ✅: ${value}`;
+                statusEl.textContent = "Sent ✅";
+              } else {
+                statusEl.textContent = "Detected (waiting cooldown)…";
               }
             } else {
-              statusEl.textContent = "No QR detected";
+              setPill("warn", "Scanning…");
+              statusEl.textContent = "Looking for a QR code…";
+              hintEl.textContent = "Hold the QR inside the frame.";
             }
           }
         } catch (e) {
+          setPill("err", "Scan error");
           statusEl.textContent = "Scan error: " + e.message;
+          hintEl.textContent = "Try refreshing the page or checking camera permissions.";
         }
         requestAnimationFrame(loop);
       };
@@ -154,21 +415,27 @@
 
     (async () => {
       try {
-        // Webcam requires HTTPS except localhost.
+        setPill("warn", "Starting…");
         statusEl.textContent = "Starting camera…";
+        hintEl.textContent = "Please allow camera access when prompted.";
+
         await startCamera();
 
         if ("BarcodeDetector" in window) {
-          statusEl.textContent = "Scanning (BarcodeDetector)…";
+          setPill("warn", "Scanning…");
+          statusEl.textContent = "Scanning…";
+          hintEl.textContent = "Point the camera at a QR code.";
           await scanWithBarcodeDetector();
         } else {
-          statusEl.textContent = "Scanning (jsQR fallback)…";
+          setPill("warn", "Scanning…");
+          statusEl.textContent = "Scanning…";
+          hintEl.textContent = "Point the camera at a QR code.";
           await scanWithJsQR();
         }
       } catch (e) {
-        statusEl.textContent =
-          "Failed to start: " + e.message +
-          " | Note: webcam access requires HTTPS (or localhost).";
+        setPill("err", "Camera blocked");
+        statusEl.textContent = "Failed to start: " + e.message;
+        hintEl.textContent = "Webcam access requires HTTPS (or localhost). Check browser permissions.";
       }
     })();
   </script>
