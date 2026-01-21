@@ -3,230 +3,247 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Scanare Cod QR</title>
+  <title>Scanare Ieșire</title>
 
-  <!-- Configurație runtime (opțional) -->
   <script src="env.js"></script>
 
   <style>
-    /* STIL IDENTIC – nemodificat */
-    /* (l-am lăsat neschimbat intenționat) */
+    :root{
+      --bg1:#0b1020;
+      --bg2:#0a1a2a;
+      --ok:#22c55e;
+      --warn:#f59e0b;
+      --err:#ef4444;
+      --text:#e6eaf2;
+      --muted:#9aa7bd;
+      --shadow:0 20px 60px rgba(0,0,0,.45);
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      color:var(--text);
+      background:
+        radial-gradient(900px 600px at 20% 10%, rgba(99,102,241,.25), transparent 55%),
+        radial-gradient(900px 600px at 80% 30%, rgba(14,165,233,.18), transparent 55%),
+        linear-gradient(180deg, var(--bg1), var(--bg2));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .frame{
+      width:min(1100px, 100%);
+      padding:24px;
+    }
+
+    .card{
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      background:rgba(15,23,42,.55);
+      border:1px solid rgba(255,255,255,.08);
+      overflow:hidden;
+    }
+
+    header{
+      padding:18px 22px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      font-size:18px;
+      font-weight:700;
+    }
+
+    header span{
+      font-size:14px;
+      font-weight:500;
+      color:var(--muted);
+    }
+
+    .videoWrap{
+      position:relative;
+      padding:18px;
+    }
+
+    video{
+      width:100%;
+      aspect-ratio:16/10;
+      object-fit:cover;
+      border-radius:14px;
+      background:#050914;
+      transform: scaleX(-1);
+    }
+
+    .scanHint{
+      position:absolute;
+      left:50%;top:50%;
+      transform:translate(-50%,-50%);
+      border:2px dashed rgba(255,255,255,.35);
+      border-radius:20px;
+      width:min(420px,70%);
+      aspect-ratio:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      padding:18px;
+      font-size:18px;
+      font-weight:600;
+      background:rgba(0,0,0,.25);
+    }
+
+    /* SUCCESS OVERLAY */
+    .success{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.75);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:999;
+      opacity:0;
+      pointer-events:none;
+      transition:.2s;
+    }
+
+    .success.show{
+      opacity:1;
+      pointer-events:auto;
+    }
+
+    .successBox{
+      background:linear-gradient(180deg,#22c55e,#16a34a);
+      color:white;
+      padding:48px 56px;
+      border-radius:28px;
+      text-align:center;
+      box-shadow:0 30px 80px rgba(0,0,0,.6);
+      animation:pop .25s ease-out;
+    }
+
+    @keyframes pop{
+      from{transform:scale(.9);opacity:.6}
+      to{transform:scale(1);opacity:1}
+    }
+
+    .successBox h1{
+      margin:0 0 12px;
+      font-size:48px;
+    }
+
+    .successBox p{
+      margin:0;
+      font-size:22px;
+      font-weight:600;
+    }
   </style>
 </head>
 
 <body>
-  <div class="shell">
+  <div class="frame">
     <div class="card">
-      <div class="header">
-        <div class="title">
-          <h1>Scanează codul QR</h1>
-          <p>Ține codul în interiorul cadrului</p>
-        </div>
-        <div class="pill" id="pill">
-          <span class="dot" id="dot"></span>
-          <span id="pillText">Pornire…</span>
-        </div>
-      </div>
+      <header>
+        <div>Ieșire elevi</div>
+        <span>Scanează codul QR</span>
+      </header>
 
       <div class="videoWrap">
-        <div class="videoFrame">
-          <video id="video" autoplay playsinline></video>
-          <div class="overlay"></div>
-          <div class="scanBox">
-            <span class="corn c1"></span><span class="corn c2"></span>
-            <span class="corn c3"></span><span class="corn c4"></span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="side">
-        <div class="statusCard">
-          <div class="label">Stare</div>
-          <div class="statusLine">
-            <div class="statusText" id="status">Inițializare…</div>
-          </div>
-
-          <div class="hint" id="hint">
-            Este necesară permisiunea pentru cameră. Accesul la webcam necesită HTTPS (sau localhost).
-          </div>
-
-          <div class="label" style="margin-top:14px;">Ultima valoare detectată</div>
-          <div class="lastValue" id="lastValue">(niciuna)</div>
+        <video id="video" autoplay playsinline></video>
+        <div class="scanHint">
+          Ține codul QR<br/>în acest pătrat
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Librărie fallback -->
+  <!-- SUCCESS OVERLAY -->
+  <div class="success" id="success">
+    <div class="successBox">
+      <h1>✔ Scanare reușită!</h1>
+      <p>Poți ieși. Drum bun! 👋</p>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
 
   <script>
     const video = document.getElementById("video");
-    const statusEl = document.getElementById("status");
-    const hintEl = document.getElementById("hint");
-    const lastValueEl = document.getElementById("lastValue");
+    const success = document.getElementById("success");
 
-    const dotEl = document.getElementById("dot");
-    const pillTextEl = document.getElementById("pillText");
+    const BACKEND =
+      (window.APP_CONFIG && window.APP_CONFIG.DEFAULT_BACKEND) ;
 
-    const DEFAULT_BACKEND =
-      (window.APP_CONFIG && window.APP_CONFIG.DEFAULT_BACKEND) || "/api/scan";
+    const RESET_MS = 3000;
+    let lastValue = null;
 
-    const COOLDOWN_MS = 2000;
-    let lastSentValue = null;
-    let lastSentAt = 0;
-
-    function setPill(state, text) {
-      pillTextEl.textContent = text;
-      dotEl.classList.remove("ok", "err");
-      if (state === "ok") dotEl.classList.add("ok");
-      else if (state === "err") dotEl.classList.add("err");
+    function showSuccess(){
+      success.classList.add("show");
+      setTimeout(() => {
+        success.classList.remove("show");
+        lastValue = null;
+      }, RESET_MS);
     }
 
-    function canSend(value) {
-      const now = Date.now();
-      if (value !== lastSentValue || (now - lastSentAt) > COOLDOWN_MS) {
-        lastSentValue = value;
-        lastSentAt = now;
-        return true;
-      }
-      return false;
-    }
-
-    async function postValue(value) {
-      const res = await fetch(DEFAULT_BACKEND, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+    async function postValue(value){
+      await fetch(BACKEND,{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body:JSON.stringify({
           value,
-          scanned_at: new Date().toISOString(),
-          user_agent: navigator.userAgent
+          scanned_at:new Date().toISOString()
         })
       });
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`Eroare backend ${res.status}${text ? ": " + text : ""}`);
-      }
     }
 
-    async function startCamera() {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("getUserMedia nu este suportat");
-      }
+    async function startCamera(){
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-        audio: false
+        video:{ facingMode:"environment" },
+        audio:false
       });
       video.srcObject = stream;
       await video.play();
     }
 
-    async function scanWithBarcodeDetector() {
-      const detector = new BarcodeDetector({ formats: ["qr_code"] });
+    async function scan(){
+      const detector = "BarcodeDetector" in window
+        ? new BarcodeDetector({ formats:["qr_code"] })
+        : null;
 
-      const loop = async () => {
-        try {
-          const codes = await detector.detect(video);
-          if (codes?.length) {
-            const value = codes[0].rawValue;
-            lastValueEl.textContent = value;
-
-            setPill("ok", "Cod detectat");
-            statusEl.textContent = "Cod QR detectat. Se trimite…";
-            hintEl.textContent = "Ține codul nemișcat câteva secunde.";
-
-            if (canSend(value)) {
-              await postValue(value);
-              statusEl.textContent = "Trimis cu succes ✅";
-            } else {
-              statusEl.textContent = "Detectat (așteptare cooldown)…";
-            }
-          } else {
-            setPill("warn", "Se scanează…");
-            statusEl.textContent = "Se caută un cod QR…";
-            hintEl.textContent = "Poziționează codul în interiorul cadrului.";
-          }
-        } catch (e) {
-          setPill("err", "Eroare scanare");
-          statusEl.textContent = "Eroare: " + e.message;
-          hintEl.textContent = "Reîncarcă pagina sau verifică permisiunile camerei.";
-        }
-        requestAnimationFrame(loop);
-      };
-      loop();
-    }
-
-    async function scanWithJsQR() {
       const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      const ctx = canvas.getContext("2d", { willReadFrequently:true });
 
-      const loop = async () => {
-        try {
-          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      async function loop(){
+        try{
+          let value = null;
+
+          if(detector){
+            const codes = await detector.detect(video);
+            if(codes.length) value = codes[0].rawValue;
+          } else {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-            if (code?.data) {
-              const value = code.data;
-              lastValueEl.textContent = value;
-
-              setPill("ok", "Cod detectat");
-              statusEl.textContent = "Cod QR detectat. Se trimite…";
-              hintEl.textContent = "Ține codul nemișcat câteva secunde.";
-
-              if (canSend(value)) {
-                await postValue(value);
-                statusEl.textContent = "Trimis cu succes ✅";
-              } else {
-                statusEl.textContent = "Detectat (așteptare cooldown)…";
-              }
-            } else {
-              setPill("warn", "Se scanează…");
-              statusEl.textContent = "Se caută un cod QR…";
-              hintEl.textContent = "Poziționează codul în interiorul cadrului.";
-            }
+            ctx.drawImage(video,0,0);
+            const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+            const code = jsQR(img.data,img.width,img.height);
+            if(code) value = code.data;
           }
-        } catch (e) {
-          setPill("err", "Eroare scanare");
-          statusEl.textContent = "Eroare: " + e.message;
-          hintEl.textContent = "Reîncarcă pagina sau verifică permisiunile camerei.";
-        }
+
+          if(value && value !== lastValue){
+            lastValue = value;
+            await postValue(value);
+            showSuccess();
+          }
+        }catch{}
         requestAnimationFrame(loop);
-      };
+      }
       loop();
     }
 
-    (async () => {
-      try {
-        setPill("warn", "Pornire…");
-        statusEl.textContent = "Pornire cameră…";
-        hintEl.textContent = "Acordă permisiunea pentru cameră când ești întrebat.";
-
-        await startCamera();
-
-        if ("BarcodeDetector" in window) {
-          setPill("warn", "Se scanează…");
-          statusEl.textContent = "Se scanează…";
-          hintEl.textContent = "Îndreaptă camera către codul QR.";
-          await scanWithBarcodeDetector();
-        } else {
-          setPill("warn", "Se scanează…");
-          statusEl.textContent = "Se scanează…";
-          hintEl.textContent = "Îndreaptă camera către codul QR.";
-          await scanWithJsQR();
-        }
-      } catch (e) {
-        setPill("err", "Camera blocată");
-        statusEl.textContent = "Nu s-a putut porni: " + e.message;
-        hintEl.textContent = "Accesul la cameră necesită HTTPS (sau localhost). Verifică setările browserului.";
-      }
+    (async ()=>{
+      await startCamera();
+      await scan();
     })();
   </script>
 </body>
