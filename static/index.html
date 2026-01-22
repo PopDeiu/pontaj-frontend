@@ -138,6 +138,51 @@
       font-size:22px;
       font-weight:600;
     }
+
+    /* === NOU: ERROR OVERLAY (roșu) === */
+    .error{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.75);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:1000;
+      opacity:0;
+      pointer-events:none;
+      transition:.2s;
+    }
+    .error.show{
+      opacity:1;
+      pointer-events:auto;
+    }
+    .errorBox{
+      background:linear-gradient(180deg,#ef4444,#b91c1c);
+      color:white;
+      padding:44px 52px;
+      border-radius:28px;
+      text-align:center;
+      box-shadow:0 30px 80px rgba(0,0,0,.6);
+      animation:pop .25s ease-out;
+      max-width: 720px;
+      margin: 0 18px;
+    }
+    .errorBox h1{
+      margin:0 0 10px;
+      font-size:44px;
+    }
+    .errorBox p{
+      margin:0;
+      font-size:20px;
+      font-weight:650;
+      line-height:1.25;
+    }
+    .errorBox .small{
+      margin-top:10px;
+      font-size:14px;
+      font-weight:600;
+      opacity:.9;
+    }
   </style>
 </head>
 
@@ -166,16 +211,30 @@
     </div>
   </div>
 
+  <!-- === NOU: ERROR OVERLAY === -->
+  <div class="error" id="error">
+    <div class="errorBox">
+      <h1>✖ Nu a mers</h1>
+      <p id="errorMsg">Te rog încearcă din nou.</p>
+      <div class="small">Ține codul nemișcat în pătrat.</div>
+    </div>
+  </div>
+
   <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
 
   <script>
     const video = document.getElementById("video");
     const success = document.getElementById("success");
 
+    // NOU
+    const error = document.getElementById("error");
+    const errorMsg = document.getElementById("errorMsg");
+
     const BACKEND =
-      (window.APP_CONFIG && window.APP_CONFIG.DEFAULT_BACKEND) ;
+      (window.APP_CONFIG && window.APP_CONFIG.DEFAULT_BACKEND);
 
     const RESET_MS = 3000;
+    const ERROR_MS = 2500; // cât timp stă mesajul de eroare
     let lastValue = null;
 
     function showSuccess(){
@@ -186,8 +245,23 @@
       }, RESET_MS);
     }
 
+    // NOU
+    function showError(message){
+      errorMsg.textContent = message || "Te rog încearcă din nou.";
+      error.classList.add("show");
+      setTimeout(() => {
+        error.classList.remove("show");
+        lastValue = null; // permite rescanare după eroare
+      }, ERROR_MS);
+    }
+
+    // MODIFICAT: consideră scanarea validă doar dacă răspunsul e JSON și are Activ: 1
     async function postValue(value){
-      await fetch(BACKEND,{
+      if (!BACKEND) {
+        throw new Error("BACKEND nu este setat (DEFAULT_BACKEND lipsește).");
+      }
+
+      const res = await fetch(BACKEND,{
         method:"POST",
         headers:{ "Content-Type":"application/json" },
         body:JSON.stringify({
@@ -195,6 +269,40 @@
           scanned_at:new Date().toISOString()
         })
       });
+
+      // Dacă backend-ul răspunde cu 4xx/5xx -> invalid
+      if (!res.ok) {
+        let txt = "";
+        try { txt = await res.text(); } catch {}
+        throw new Error(`Răspuns invalid de la server (${res.status}).`);
+      }
+
+      // Verificăm că e JSON
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      if (!ct.includes("application/json")) {
+        throw new Error("Serverul nu a trimis JSON.");
+      }
+
+      // Parsăm JSON
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error("Nu pot citi răspunsul JSON.");
+      }
+
+      // Validăm Activ: 1
+      const activ = data?.Activ;
+      const ok =
+        activ === 1 ||
+        activ === "1" ||
+        activ === true;
+
+      if (!ok) {
+        throw new Error("Scanarea nu este acceptată.");
+      }
+
+      return data; // dacă vrei să folosești și alte câmpuri
     }
 
     async function startCamera(){
@@ -232,8 +340,14 @@
 
           if(value && value !== lastValue){
             lastValue = value;
-            await postValue(value);
-            showSuccess();
+
+            try {
+              await postValue(value);   // doar aici decidem dacă e valid
+              showSuccess();
+            } catch (e) {
+              // Mesaj prietenos pentru elevi
+              showError(e?.message || "Nu a mers. Încearcă din nou.");
+            }
           }
         }catch{}
         requestAnimationFrame(loop);
