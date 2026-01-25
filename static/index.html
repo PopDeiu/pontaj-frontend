@@ -139,7 +139,7 @@
       font-weight:600;
     }
 
-    /* === NOU: ERROR OVERLAY (roșu) === */
+    /* ERROR OVERLAY (roșu) */
     .error{
       position:fixed;
       inset:0;
@@ -207,11 +207,11 @@
   <div class="success" id="success">
     <div class="successBox">
       <h1>✔ Scanare reușită!</h1>
-      <p>Poți ieși. Drum bun! 👋</p>
+      <p id="successMsg">Poți ieși. Drum bun! 👋</p>
     </div>
   </div>
 
-  <!-- === NOU: ERROR OVERLAY === -->
+  <!-- ERROR OVERLAY -->
   <div class="error" id="error">
     <div class="errorBox">
       <h1>✖ Nu a mers</h1>
@@ -225,8 +225,8 @@
   <script>
     const video = document.getElementById("video");
     const success = document.getElementById("success");
+    const successMsg = document.getElementById("successMsg");
 
-    // NOU
     const error = document.getElementById("error");
     const errorMsg = document.getElementById("errorMsg");
 
@@ -234,10 +234,14 @@
       (window.APP_CONFIG && window.APP_CONFIG.DEFAULT_BACKEND);
 
     const RESET_MS = 3000;
-    const ERROR_MS = 2500; // cât timp stă mesajul de eroare
+    const ERROR_MS = 2500;
     let lastValue = null;
 
-    function showSuccess(){
+    function showSuccess(name){
+      successMsg.textContent = name
+        ? `Scanare reușită, ${name}! Poți ieși 👋`
+        : "Scanare reușită! Poți ieși 👋";
+
       success.classList.add("show");
       setTimeout(() => {
         success.classList.remove("show");
@@ -245,67 +249,62 @@
       }, RESET_MS);
     }
 
-    // NOU
     function showError(message){
       errorMsg.textContent = message || "Te rog încearcă din nou.";
       error.classList.add("show");
       setTimeout(() => {
         error.classList.remove("show");
-        lastValue = null; // permite rescanare după eroare
+        lastValue = null;
       }, ERROR_MS);
     }
 
+    // Trimite valoarea QR ca HTTP Bearer (Authorization header)
+    // Consideră scanarea validă doar dacă răspunsul e JSON și are Activ: 1
     async function postValue(value){
-    if (!BACKEND) {
-      throw new Error("BACKEND nu este setat (DEFAULT_BACKEND lipsește).");
+      if (!BACKEND) {
+        throw new Error("BACKEND nu este setat (DEFAULT_BACKEND lipsește).");
+      }
+
+      const res = await fetch(BACKEND,{
+        method:"POST",
+        headers:{
+          "Authorization": `Bearer ${value}`,
+          "Content-Type":"application/json"
+        },
+        // body e opțional; îl păstrăm doar cu timestamp
+        body: JSON.stringify({
+          scanned_at: new Date().toISOString()
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error(`Răspuns invalid de la server (${res.status}).`);
+      }
+
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      if (!ct.includes("application/json")) {
+        throw new Error("Serverul nu a trimis JSON.");
+      }
+
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error("Nu pot citi răspunsul JSON.");
+      }
+
+      const activ = data?.Activ;
+      const ok =
+        activ === 1 ||
+        activ === "1" ||
+        activ === true;
+
+      if (!ok) {
+        throw new Error("Scanarea nu este acceptată.");
+      }
+
+      return data;
     }
-
-    const res = await fetch(BACKEND, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${value}`,
-        "Content-Type": "application/json"
-      },
-      // body este opțional; îl poți elimina complet dacă backend-ul nu are nevoie
-      body: JSON.stringify({
-        scanned_at: new Date().toISOString()
-      })
-    });
-
-    // Dacă backend-ul răspunde cu 4xx/5xx → invalid
-    if (!res.ok) {
-      let txt = "";
-      try { txt = await res.text(); } catch {}
-      throw new Error(`Răspuns invalid de la server (${res.status}).`);
-    }
-
-    // Verificăm că e JSON
-    const ct = (res.headers.get("content-type") || "").toLowerCase();
-    if (!ct.includes("application/json")) {
-      throw new Error("Serverul nu a trimis JSON.");
-    }
-
-    // Parsăm JSON
-    let data;
-    try {
-      data = await res.json();
-    } catch {
-      throw new Error("Nu pot citi răspunsul JSON.");
-    }
-
-    // Validăm Activ: 1
-    const activ = data?.Activ;
-    const ok =
-      activ === 1 ||
-      activ === "1" ||
-      activ === true;
-
-    if (!ok) {
-      throw new Error("Scanarea nu este acceptată.");
-    }
-
-    return data;
-  }
 
     async function startCamera(){
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -344,10 +343,9 @@
             lastValue = value;
 
             try {
-              await postValue(value);   // doar aici decidem dacă e valid
-              showSuccess();
+              const data = await postValue(value);
+              showSuccess(data?.Name);
             } catch (e) {
-              // Mesaj prietenos pentru elevi
               showError(e?.message || "Nu a mers. Încearcă din nou.");
             }
           }
