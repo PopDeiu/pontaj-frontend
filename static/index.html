@@ -255,55 +255,57 @@
       }, ERROR_MS);
     }
 
-    // MODIFICAT: consideră scanarea validă doar dacă răspunsul e JSON și are Activ: 1
     async function postValue(value){
-      if (!BACKEND) {
-        throw new Error("BACKEND nu este setat (DEFAULT_BACKEND lipsește).");
-      }
-
-      const res = await fetch(BACKEND,{
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body:JSON.stringify({
-          value,
-          scanned_at:new Date().toISOString()
-        })
-      });
-
-      // Dacă backend-ul răspunde cu 4xx/5xx -> invalid
-      if (!res.ok) {
-        let txt = "";
-        try { txt = await res.text(); } catch {}
-        throw new Error(`Răspuns invalid de la server (${res.status}).`);
-      }
-
-      // Verificăm că e JSON
-      const ct = (res.headers.get("content-type") || "").toLowerCase();
-      if (!ct.includes("application/json")) {
-        throw new Error("Serverul nu a trimis JSON.");
-      }
-
-      // Parsăm JSON
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        throw new Error("Nu pot citi răspunsul JSON.");
-      }
-
-      // Validăm Activ: 1
-      const activ = data?.Activ;
-      const ok =
-        activ === 1 ||
-        activ === "1" ||
-        activ === true;
-
-      if (!ok) {
-        throw new Error("Scanarea nu este acceptată.");
-      }
-
-      return data; // dacă vrei să folosești și alte câmpuri
+    if (!BACKEND) {
+      throw new Error("BACKEND nu este setat (DEFAULT_BACKEND lipsește).");
     }
+
+    const res = await fetch(BACKEND, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${value}`,
+        "Content-Type": "application/json"
+      },
+      // body este opțional; îl poți elimina complet dacă backend-ul nu are nevoie
+      body: JSON.stringify({
+        scanned_at: new Date().toISOString()
+      })
+    });
+
+    // Dacă backend-ul răspunde cu 4xx/5xx → invalid
+    if (!res.ok) {
+      let txt = "";
+      try { txt = await res.text(); } catch {}
+      throw new Error(`Răspuns invalid de la server (${res.status}).`);
+    }
+
+    // Verificăm că e JSON
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    if (!ct.includes("application/json")) {
+      throw new Error("Serverul nu a trimis JSON.");
+    }
+
+    // Parsăm JSON
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error("Nu pot citi răspunsul JSON.");
+    }
+
+    // Validăm Activ: 1
+    const activ = data?.Activ;
+    const ok =
+      activ === 1 ||
+      activ === "1" ||
+      activ === true;
+
+    if (!ok) {
+      throw new Error("Scanarea nu este acceptată.");
+    }
+
+    return data;
+  }
 
     async function startCamera(){
       const stream = await navigator.mediaDevices.getUserMedia({
