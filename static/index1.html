@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Scanner - School</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <canvas id="starfield"></canvas>
+    
+    <div class="animated-bg">
+        <div class="circle circle-1"></div>
+        <div class="circle circle-2"></div>
+        <div class="circle circle-3"></div>
+    </div>
+
+    <header>
+        <div class="header-content">
+            <div class="status-indicator">
+                <span class="status-dot"></span>
+                <span class="status-text">Sistem Activ</span>
+            </div>
+        </div>
+    </header>
+
+    <section id="hero">
+        <div id="scanner-container">
+            <div class="title-group">
+                <h1>Scaneză Codul QR</h1>
+                <div class="title-underline"></div>
+            </div>
+            <p class="subtitle">📱 Apasă butonul pentru a deschide camera și scana codul QR</p>
+            
+            <div class="card">
+                <button id="startCameraBtn" class="camera-btn">
+                    <span class="btn-icon">📷</span>
+                    <span class="btn-text">Deschide Camera</span>
+                    <span class="btn-shine"></span>
+                </button>
+                
+                <div class="video-wrapper" id="videoWrapper" style="display: none;">
+                    <div class="scanner-frame">
+                        <div class="corner corner-tl"></div>
+                        <div class="corner corner-tr"></div>
+                        <div class="corner corner-bl"></div>
+                        <div class="corner corner-br"></div>
+                        <div class="scanning-line"></div>
+                    </div>
+                    <video id="video" autoplay playsinline></video>
+                </div>
+                
+                <canvas id="canvas" hidden></canvas>
+            </div>
+            
+            <div id="result" class="result-box">
+                <span class="result-icon">🔍</span>
+                <span class="result-text">Apasă butonul pentru a începe scanarea...</span>
+            </div>
+            
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon">⚡</div>
+                    <div class="feature-text">Scanare Rapidă</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔒</div>
+                    <div class="feature-text">Sigur & Privat</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">✨</div>
+                    <div class="feature-text">Precizie Maximă</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <script src="starfield.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

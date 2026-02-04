@@ -260,6 +260,7 @@
 
     // Trimite valoarea QR ca HTTP Bearer (Authorization header)
     // Consideră scanarea validă doar dacă răspunsul e JSON și are Activ: 1
+    // Trimite valoarea QR ca HTTP Bearer
     async function postValue(value){
       if (!BACKEND) {
         throw new Error("BACKEND nu este setat (DEFAULT_BACKEND lipsește).");
@@ -271,28 +272,31 @@
           "Authorization": `Bearer ${value}`,
           "Content-Type":"application/json"
         },
-        // body e opțional; îl păstrăm doar cu timestamp
         body: JSON.stringify({
           scanned_at: new Date().toISOString()
         })
       });
 
-      if (!res.ok) {
-        throw new Error(`Răspuns invalid de la server (${res.status}).`);
-      }
-
-      const ct = (res.headers.get("content-type") || "").toLowerCase();
-      if (!ct.includes("application/json")) {
-        throw new Error("Serverul nu a trimis JSON.");
-      }
-
+      // 1. Încercăm să parsam JSON-ul indiferent de status (poate conține eroarea)
       let data;
       try {
         data = await res.json();
-      } catch {
-        throw new Error("Nu pot citi răspunsul JSON.");
+      } catch (e) {
+        // Dacă nu e JSON și avem eroare HTTP, aruncăm eroarea de status
+        if (!res.ok) throw new Error(`Eroare server (${res.status}).`);
       }
 
+      // 2. Dacă serverul a răspuns cu eroare (ex: 400, 403, 409)
+      if (!res.ok) {
+        // Verificăm dacă serverul a trimis un mesaj specific în "detail"
+        if (data && data.detail) {
+          throw new Error(data.detail); 
+        }
+        // Fallback dacă nu există "detail"
+        throw new Error(`Eroare neașteptată (${res.status}).`);
+      }
+
+      // 3. Dacă statusul e 200 OK, verificăm logica de business (Activ)
       const activ = data?.Activ;
       const ok =
         activ === 1 ||
@@ -300,7 +304,8 @@
         activ === true;
 
       if (!ok) {
-        throw new Error("Scanarea nu este acceptată.");
+        // Poți personaliza și aici dacă serverul trimite motivul inactivității
+        throw new Error("Scanarea nu este acceptată (Elev Inactiv).");
       }
 
       return data;
